@@ -4,8 +4,8 @@ import flet as ft
 
 def main(page: ft.Page):
     page.title = "Choislet"
-    page.window_width = 1280
-    page.window_height = 720
+    page.window_width = 1295
+    page.window_height = 758
     page.window_resizable = False
     page.padding = 0
 
@@ -17,25 +17,75 @@ def main(page: ft.Page):
     cerulean = "#1d7d9e"
 
     items_nav = [
-        ft.Container(width=50, height=50, border=ft.border.all(),
-                     margin=ft.margin.only(top=20, left=15, right=15, bottom=0)),
-        ft.Container(width=50, height=50, border=ft.border.all(),
-                     margin=ft.margin.only(top=20, left=15, right=15, bottom=0)),
-        ft.Container(width=50, height=50, border=ft.border.all(),
-                     margin=ft.margin.only(top=20, left=15, right=15, bottom=0)),
-        ft.Container(width=50, height=50, border=ft.border.all(),
-                     margin=ft.margin.only(top=20, left=15, right=15, bottom=0))
+        ft.Container(
+            width=50, height=50,
+            margin=ft.margin.only(top=20, left=15, right=15),
+            border=ft.border.all()
+        ),
+        ft.Container(
+            width=50, height=50,
+            margin=ft.margin.only(top=20, left=15, right=15),
+            border=ft.border.all()
+        ),
+        ft.Container(
+            width=50, height=50,
+            margin=ft.margin.only(top=20, left=15, right=15),
+            border=ft.border.all()
+        ),
+        ft.Container(
+            width=50, height=50,
+            margin=ft.margin.only(top=20, left=15, right=15),
+            border=ft.border.all()
+        )
     ]
 
-    nav = ft.Container(content=ft.Column(items_nav, spacing=0), width=80,
-                       height=720, bgcolor=prussian_blue, alignment=ft.alignment.top_center)
-    game = ft.Container(width=700, height=720, border=ft.border.all())
-    user_input = ft.Container(width=500, height=720, border=ft.border.all())
+    game_title = ft.Text("Roulette", color=saffron,
+                         size=40, weight=ft.FontWeight.BOLD)
+
+    text_input = ft.TextField(
+        bgcolor=prussian_blue,
+        multiline=True, width=440, height=450,
+        label='Escribe las opciones',
+        color=columbia_blue,
+        border_radius=20
+    )
+
+    start_button = ft.ElevatedButton(
+        content=ft.Text("Spin", size=24),
+        bgcolor=cerulean,
+        color=columbia_blue,
+        width=275,
+        height=80
+    )
+
+    items_user_input = [
+        ft.Container(content=game_title, width=500, height=100,
+                     alignment=ft.alignment.center, border=ft.border.all()),
+        ft.Container(content=text_input, width=500,
+                     height=470, alignment=ft.alignment.center, border=ft.border.all()),
+        ft.Container(content=start_button, width=500, height=150,
+                     alignment=ft.alignment.center, border=ft.border.all())
+    ]
+
+    nav = ft.Container(
+        content=ft.Column(items_nav, spacing=0),
+        width=80, height=720, bgcolor=prussian_blue,
+        alignment=ft.alignment.top_center, border=ft.border.all()
+    )
+    game = ft.Container(
+        width=700, height=720, border=ft.border.all()
+    )
+    user_input = ft.Container(
+        content=ft.Column(items_user_input, spacing=0),
+        width=500, height=720, border=ft.border.all()
+    )
 
     row = ft.Row(spacing=0, controls=[nav, game, user_input])
 
-    container = ft.Container(row, width=1280, height=720,
-                             bgcolor=oxford_blue, alignment=ft.alignment.center_left)
+    container = ft.Container(
+        content=row, width=1280, height=720,
+        bgcolor=oxford_blue, alignment=ft.alignment.center_left
+    )
 
     page.add(container)
 
