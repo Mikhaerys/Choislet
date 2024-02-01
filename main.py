@@ -16,23 +16,45 @@ def main(page: ft.Page):
     columbia_blue = "#d6efff"
     cerulean = "#1d7d9e"
 
+    app_icon = ft.Image(
+        src="./Icons/Choislet.png", fit=ft.ImageFit.CONTAIN,
+        width=50, height=50
+    )
+    roulette_icon = ft.Image(
+        src="./Icons/ruleta.png", fit=ft.ImageFit.CONTAIN,
+        width=50, height=50
+    )
+    coin_icon = ft.Image(
+        src="./Icons/moneda.png", fit=ft.ImageFit.CONTAIN,
+        width=50, height=50
+    )
+    dice_icon = ft.Image(
+        src="./Icons/dado.png", fit=ft.ImageFit.CONTAIN,
+        width=50, height=50
+    )
+
     items_nav = [
         ft.Container(
+            content=app_icon,
+            image_src="/Icons/ruleta.png",
             width=50, height=50,
             margin=ft.margin.only(top=20, left=15, right=15),
             border=ft.border.all()
         ),
         ft.Container(
+            content=roulette_icon,
             width=50, height=50,
             margin=ft.margin.only(top=20, left=15, right=15),
             border=ft.border.all()
         ),
         ft.Container(
+            content=coin_icon,
             width=50, height=50,
             margin=ft.margin.only(top=20, left=15, right=15),
             border=ft.border.all()
         ),
         ft.Container(
+            content=dice_icon,
             width=50, height=50,
             margin=ft.margin.only(top=20, left=15, right=15),
             border=ft.border.all()
