@@ -1,5 +1,7 @@
+import math
 import random
 import flet as ft
+import flet.canvas as cv
 
 
 def main(page: ft.Page):
@@ -9,13 +11,14 @@ def main(page: ft.Page):
     page.window_resizable = False
     page.padding = 0
 
-    # Colors
+    # ------------------------------- Colors -------------------------------
     oxford_blue = "#10192c"
     prussian_blue = "#1e3b5c"
     saffron = "#fec965"
     columbia_blue = "#d6efff"
     cerulean = "#1d7d9e"
 
+    # ---------------------------- Icons of Nav ----------------------------
     app_icon = ft.Image(
         src="./Icons/Choislet.png", fit=ft.ImageFit.CONTAIN,
         width=50, height=50
@@ -61,6 +64,40 @@ def main(page: ft.Page):
         )
     ]
 
+    # ---------------------------- Roullete interface ----------------------------
+    roulette_canva = cv.Canvas(
+        [
+            cv.Path(
+                [
+                    cv.Path.MoveTo(300, 300),
+                    cv.Path.LineTo(600, 300),
+                    cv.Path.ArcTo(300, 0, 300, clockwise=False)
+                ],
+                paint=ft.Paint(
+                    stroke_width=2, style=ft.PaintingStyle.FILL, color=saffron)
+            )
+        ],
+        width=600, height=600
+    )
+
+    roulette_section = [
+        ft.Container(
+            content=roulette_canva,
+            width=600, height=600
+        ),
+        ft.Container(
+            content=ft.Text(
+                value="Winner: ",
+                color=saffron,
+                size=30
+            ),
+            width=700, height=100,
+            border=ft.border.all(),
+            alignment=ft.alignment.center
+        )
+    ]
+
+    # ---------------------------- User input interface ----------------------------
     game_title = ft.Text("Roulette", color=saffron,
                          size=40, weight=ft.FontWeight.BOLD)
 
@@ -89,13 +126,18 @@ def main(page: ft.Page):
                      alignment=ft.alignment.center, border=ft.border.all())
     ]
 
+    # ---------------------------- Sections of the app ----------------------------
     nav = ft.Container(
         content=ft.Column(items_nav, spacing=0),
         width=80, height=720, bgcolor=prussian_blue,
         alignment=ft.alignment.top_center, border=ft.border.all()
     )
     game = ft.Container(
-        width=700, height=720, border=ft.border.all()
+        content=ft.Column(roulette_section, spacing=0),
+        width=700, height=720,
+        border=ft.border.all(),
+        alignment=ft.alignment.center,
+        padding=ft.padding.only(top=10)
     )
     user_input = ft.Container(
         content=ft.Column(items_user_input, spacing=0),
@@ -104,6 +146,7 @@ def main(page: ft.Page):
 
     row = ft.Row(spacing=0, controls=[nav, game, user_input])
 
+    # ----------------------------  Main Container ----------------------------
     container = ft.Container(
         content=row, width=1280, height=720,
         bgcolor=oxford_blue, alignment=ft.alignment.center_left
