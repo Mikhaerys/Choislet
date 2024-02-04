@@ -11,14 +11,91 @@ def main(page: ft.Page):
     page.window_resizable = False
     page.padding = 0
 
-    # ------------------------------- Colors -------------------------------
+    # -------------------------------- variables --------------------------------
     oxford_blue = "#10192c"
     prussian_blue = "#1e3b5c"
     saffron = "#fec965"
     columbia_blue = "#d6efff"
-    cerulean = "#1d7d9e"
+    cerulean = "#11495C"
+    roulette_colors = ["#fdffb6", "#caffbf", "#9bf6ff", "#a0c4ff", "#ffc6ff",]
 
-    # ---------------------------- Icons of Nav ----------------------------
+    options = []
+    roulette_divisions = []
+
+    # ------------------------------- Functions ---------------------------------
+    def draw_roullete(e):
+        options = e.control.value.splitlines()
+        number_of_colors = len(roulette_colors)
+        color_index = 0
+        division_start = 0
+        division_angle = (2*math.pi) / len(options)
+
+        for _ in options:
+            roulette_divisions.append(
+                cv.Path(
+                    [
+                        cv.Path.Arc(
+                            0, 0, 600, 600,
+                            division_start, division_angle
+                        ),
+                        cv.Path.LineTo(300, 300),
+                    ],
+                    paint=ft.Paint(color=roulette_colors[color_index])
+                )
+            )
+            roulette_divisions.append(
+                cv.Path(
+                    [
+                        cv.Path.Arc(
+                            0, 0, 600, 600,
+                            division_start, division_angle
+                        ),
+                        cv.Path.LineTo(300, 300),
+                        cv.Path.Close()
+                    ],
+                    paint=ft.Paint(style=ft.PaintingStyle.STROKE)
+                )
+            )
+
+            division_start += division_angle
+            color_index = (color_index + 1) % number_of_colors
+
+        roulette_divisions.append(
+            cv.Circle(300, 300, 20, ft.Paint(color=ft.colors.WHITE))
+        )
+        page.update()
+
+    def roulette_winner():
+        scores = {key: 0 for key in options}
+
+        while True:
+            winner = random.choice(options)
+            scores[winner] += 1
+            if scores[winner] == 3:
+                return winner
+
+    def flip_coin(head, tail):
+        return random.choice([head, tail])
+
+    def dice_game(text):
+        options = text.splitlines()
+        scores = {key: 0 for key in options}
+
+        while True:
+            for option in options:
+                dice1 = random.randint(1, 6)
+                dice2 = random.randint(1, 6)
+                scores[option] = dice1 + dice2
+
+            max_value = max(scores.values())
+            winners = [jugador for jugador,
+                       value in scores.items() if value == max_value]
+
+            if len(winners) == 1:
+                return winners, max_value
+
+            options = winners
+    # ------------------------------ Icons of Nav -------------------------------
     app_icon = ft.Image(
         src="./Icons/Choislet.png", fit=ft.ImageFit.CONTAIN,
         width=50, height=50
@@ -65,25 +142,13 @@ def main(page: ft.Page):
     ]
 
     # ---------------------------- Roullete interface ----------------------------
-    roulette_canva = cv.Canvas(
-        [
-            cv.Path(
-                [
-                    cv.Path.MoveTo(300, 300),
-                    cv.Path.LineTo(600, 300),
-                    cv.Path.ArcTo(300, 0, 300, clockwise=False)
-                ],
-                paint=ft.Paint(
-                    stroke_width=2, style=ft.PaintingStyle.FILL, color=saffron)
-            )
-        ],
-        width=600, height=600
-    )
+    roulette_canva = cv.Canvas(roulette_divisions, width=600, height=600)
 
     roulette_section = [
         ft.Container(
             content=roulette_canva,
-            width=600, height=600
+            width=700, height=600,
+            alignment=ft.alignment.center
         ),
         ft.Container(
             content=ft.Text(
@@ -106,7 +171,8 @@ def main(page: ft.Page):
         multiline=True, width=440, height=450,
         label='Escribe las opciones',
         color=columbia_blue,
-        border_radius=20
+        border_radius=20,
+        on_change=draw_roullete
     )
 
     start_button = ft.ElevatedButton(
@@ -156,38 +222,3 @@ def main(page: ft.Page):
 
 
 ft.app(target=main)
-
-
-def roulette_winner(text):
-    options = text.splitlines()
-    scores = {key: 0 for key in options}
-
-    while True:
-        winner = random.choice(options)
-        scores[winner] += 1
-        if scores[winner] == 3:
-            return winner
-
-
-def flip_coin(head, tail):
-    return random.choice([head, tail])
-
-
-def dice_game(text):
-    options = text.splitlines()
-    scores = {key: 0 for key in options}
-
-    while True:
-        for option in options:
-            dice1 = random.randint(1, 6)
-            dice2 = random.randint(1, 6)
-            scores[option] = dice1 + dice2
-
-        max_value = max(scores.values())
-        winners = [jugador for jugador,
-                   value in scores.items() if value == max_value]
-
-        if len(winners) == 1:
-            return winners, max_value
-
-        options = winners
