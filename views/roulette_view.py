@@ -13,6 +13,8 @@ class RouletteView(BaseView):
         self.candidates = ["No candidates"]
         self.roulette_divisions = []
         self.text_winner = ft.Text(color=AppColors.SAFFRON, size=30)
+        self.division_angles = []
+        self.final_position = 0
         super().__init__(page)
 
     def build(self):
@@ -149,7 +151,11 @@ class RouletteView(BaseView):
         division_start = 0
         division_angle = (2*math.pi) / len(self.candidates)
 
-        for _ in self.candidates:
+        # Store division angles for determining winner later
+        self.division_angles = []
+
+        for _, candidate in enumerate(self.candidates):
+            # Add colored sector
             self.roulette_divisions.append(
                 cv.Path(
                     [
@@ -163,6 +169,8 @@ class RouletteView(BaseView):
                         color=AppColors.ROULETTE_COLORS[color_index])
                 )
             )
+
+            # Add sector border
             self.roulette_divisions.append(
                 cv.Path(
                     [
@@ -177,9 +185,43 @@ class RouletteView(BaseView):
                 )
             )
 
+            text_angle = division_start + (division_angle / 2)
+            radius = 290
+            text_x = 300 + radius * math.cos(text_angle)
+            text_y = 300 + radius * math.sin(text_angle)
+
+            # Calculate the rotation so that the text points towards the center
+            # Invert the angle and add 90 degrees for correct orientation
+            text_rotation = text_angle + math.pi  # Rotate 180° to point to the center
+
+            # Store the start and end angles for this candidate
+            self.division_angles.append({
+                'candidate': candidate,
+                'start': division_start,
+                'end': division_start + division_angle
+            })
+
+            # Add the text
+            self.roulette_divisions.append(
+                cv.Text(
+                    text=candidate,
+                    x=text_x,
+                    y=text_y,
+                    style=ft.TextStyle(
+                        font_family="Roboto",
+                        weight=ft.FontWeight.BOLD,
+                        size=10,
+                        color=ft.Colors.BLACK,
+                    ),
+                    text_align=ft.TextAlign.CENTER,
+                    rotate=text_rotation,
+                )
+            )
+
             division_start += division_angle
             color_index = (color_index + 1) % number_of_colors
 
+        # Center circle
         self.roulette_divisions.append(
             cv.Circle(300, 300, 20, ft.Paint(color=ft.Colors.WHITE))
         )
@@ -197,6 +239,23 @@ class RouletteView(BaseView):
             if scores[winner] == 3:
                 return winner
 
+    def determine_winner_from_position(self, position):
+        # Need to normalize angle for comparison (0 to 2π)
+        normalized_position = position % (2 * math.pi)
+
+        # Find which division contains the position
+        for division in self.division_angles:
+            if division['start'] <= normalized_position < division['end']:
+                return division['candidate']
+
+        # Edge case: if position is exactly at 2π, it should match the first division
+        if abs(normalized_position - (2 * math.pi)) < 0.0001:
+            for division in self.division_angles:
+                if division['start'] == 0:
+                    return division['candidate']
+
+        return self.candidates[0]  # Fallback to first candidate
+
     def spin_roulette(self, _):  # Using underscore to indicate unused parameter
         if not self.candidates or self.candidates == ["No candidates"]:
             dlg = ft.AlertDialog(title=ft.Text(
@@ -206,28 +265,62 @@ class RouletteView(BaseView):
             self.page.update()
             return
 
-        angle_winner = math.radians(random.randint(1, 306))
-        self.roulette_stack[0].rotate.angle += (5 * math.pi) + angle_winner
+        # Reset the roulette to angle 0 before spinning to avoid cumulative errors
+        current_container = self.roulette_stack[0]
+
+        # Generate random number of rotations (between 5-8) for visual effect
+        total_rotations = random.randint(5, 8)
+
+        # Generate random final angle in radians (this determines the winner)
+        final_angle_rad = random.uniform(0, 2*math.pi)
+
+        # Total rotation angle = complete rotations + final position
+        total_angle = (total_rotations * 2*math.pi) + final_angle_rad
+
+        # The arrow points at 0 radians (right), and the wheel rotates counterclockwise
+        # So we need to calculate the final position for determining the winner
+        self.final_position = (2*math.pi) - (final_angle_rad % (2*math.pi))
+
+        current_container.animate_rotation = ft.animation.Animation(50)
+
+        current_container.rotate = None
         self.page.update()
 
-        # Use a progress bar to indicate that something is happening
+        # Small delay to ensure the above update is processed
+        time.sleep(0.05)
+
+        # Now set up the new animation with the calculated angle
+        current_container.rotate = ft.transform.Rotate(
+            angle=total_angle,
+            alignment=ft.alignment.center
+        )
+
+        # Apply animation settings - longer duration for better visual effect
+        current_container.animate_rotation = ft.animation.Animation(
+            5000, ft.AnimationCurve.DECELERATE
+        )
+
+        # Update UI to start the animation
+        self.page.update()
+
+        # Show progress indicator
         self.page.splash = ft.ProgressBar()
         self.page.update()
 
-        # Schedule the delayed action using threading
+        # Schedule the delayed action using threading to announce winner when animation completes
         def delayed_action():
-            # Simulate the waiting time for the animation
-            time.sleep(5)
+            # Wait for the animation to complete
+            # Slightly longer than animation to ensure it completes
+            time.sleep(5.5)
 
-            # Find the winner
-            winner = self.find_winner()
+            # Pre-determine the winner based on final position
+            winner = self.determine_winner_from_position(self.final_position)
 
-            # Update the winner text in the existing control
             def update_ui():
                 self.text_winner.value = f"Winner: {winner}"
                 self.page.splash = None
 
-                # Create a more visible dialog
+                # Create a dialog to announce the winner
                 dlg = ft.AlertDialog(
                     title=ft.Text("We have a winner!"),
                     content=ft.Text(
@@ -246,12 +339,11 @@ class RouletteView(BaseView):
                 dlg.open = True
                 self.page.update()
 
-            # We need to execute the UI update in the main thread
-            if hasattr(self.page, 'add_future'):  # Check if the method exists
+            # Execute UI update
+            if hasattr(self.page, 'add_future'):
                 self.page.add_future(update_ui)
             else:
-                # Alternative: execute directly
                 update_ui()
 
-        # Execute the delayed action in a separate thread
+        # Execute in a separate thread
         threading.Thread(target=delayed_action).start()
