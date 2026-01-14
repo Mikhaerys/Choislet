@@ -30,28 +30,28 @@ class ChoisletApp:
     def setup_navigation(self):
         # Icons for navigation
         app_icon = ft.Image(
-            src="./Icons/Choislet.png",
+            src="./src/assets/Choislet.png",
             fit=ft.ImageFit.CONTAIN,
             width=50,
             height=50
         )
 
         roulette_icon = ft.Image(
-            src="./Icons/ruleta.png",
+            src="./src/assets/ruleta.png",
             fit=ft.ImageFit.CONTAIN,
             width=50,
             height=50
         )
 
         coin_icon = ft.Image(
-            src="./Icons/moneda.png",
+            src="./src/assets/moneda.png",
             fit=ft.ImageFit.CONTAIN,
             width=50,
             height=50
         )
 
         dice_icon = ft.Image(
-            src="./Icons/dado.png",
+            src="./src/assets/dado.png",
             fit=ft.ImageFit.CONTAIN,
             width=50,
             height=50
