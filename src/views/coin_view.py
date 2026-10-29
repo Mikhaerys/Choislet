@@ -1,189 +1,315 @@
-import math
-import time
-import random
-import threading
+"""Coin flip view with dynamic 3D-like flip animation and statistics."""
+
+from __future__ import annotations
+import asyncio
 import flet as ft
-from views.base_view import BaseView
-from utils.constants import AppColors
+from src.views.base_view import BaseView
+from src.utils.constants import AppColors, get_text_field_border
+from src.logic.coin_logic import flip_coin, CoinStats, CoinSide
 
 
 class CoinView(BaseView):
-    def build(self):
-        # Coin flip interface
-        game_title = ft.Text(
-            "Coin Flip",
-            color=AppColors.SAFFRON,
-            size=40,
-            weight=ft.FontWeight.BOLD
+    def __init__(self, page: ft.Page):
+        self.stats = CoinStats()
+        self.is_flipping: bool = False
+        super().__init__(page)
+
+    def init_view(self) -> ft.Control:
+        # Coin visual container
+        self.coin_label = ft.Text(
+            "FLIP",
+            size=36,
+            weight=ft.FontWeight.BOLD,
+            color=AppColors.OXFORD_BLUE,
+            text_align=ft.TextAlign.CENTER,
         )
 
-        self.head_input = ft.TextField(
-            bgcolor=AppColors.PRUSSIAN_BLUE,
-            label='Heads option',
-            color=AppColors.COLUMBIA_BLUE,
-            border_radius=20,
-            width=440,
-        )
-
-        self.tail_input = ft.TextField(
-            bgcolor=AppColors.PRUSSIAN_BLUE,
-            label='Tails option',
-            color=AppColors.COLUMBIA_BLUE,
-            border_radius=20,
-            width=440,
-        )
-
-        self.result_text = ft.Text(
-            size=30,
-            color=AppColors.SAFFRON,
-        )
-
-        # Coin animation container
         self.coin_container = ft.Container(
-            width=300,
-            height=300,
-            border_radius=150,
+            width=220,
+            height=220,
+            border_radius=110,
             bgcolor=AppColors.SAFFRON,
-            alignment=ft.alignment.center,
-            content=ft.Text("FLIP", size=40, color=AppColors.OXFORD_BLUE),
-            animate=ft.animation.Animation(500, ft.AnimationCurve.BOUNCE_OUT),
+            alignment=ft.Alignment.CENTER,
+            border=ft.Border.all(6, AppColors.COLUMBIA_BLUE),
+            scale=ft.Scale(scale_x=1.0, scale_y=1.0),
+            animate_scale=ft.Animation(90, ft.AnimationCurve.EASE_IN_OUT),
+            content=self.coin_label,
+            shadow=ft.BoxShadow(
+                spread_radius=2,
+                blur_radius=16,
+                color=ft.Colors.with_opacity(0.4, AppColors.SAFFRON),
+                offset=ft.Offset(0, 6),
+            ),
         )
 
-        flip_button = ft.ElevatedButton(
-            content=ft.Text("Flip Coin", size=24),
-            bgcolor=AppColors.CERULEAN,
+        # Result badge
+        self.result_badge = ft.Container(
+            content=ft.Text(
+                "Click 'Flip Coin' to toss!",
+                size=18,
+                weight=ft.FontWeight.BOLD,
+                color=AppColors.SAFFRON,
+                text_align=ft.TextAlign.CENTER,
+            ),
+            padding=ft.Padding(left=20, right=20, top=12, bottom=12),
+            bgcolor=AppColors.CARD_BG,
+            border_radius=12,
+            border=ft.Border.all(1, AppColors.PRUSSIAN_BLUE),
+            alignment=ft.Alignment.CENTER,
+        )
+
+        # Statistics chips
+        self.stats_row = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=16,
+            controls=[
+                self._create_stat_badge("Total", "0"),
+                self._create_stat_badge("Heads", "0"),
+                self._create_stat_badge("Tails", "0"),
+            ],
+        )
+
+        left_panel = ft.Column(
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=28,
+            controls=[
+                self.coin_container,
+                self.result_badge,
+                self.stats_row,
+            ],
+        )
+
+        # Custom inputs
+        self.heads_input = ft.TextField(
+            value="Heads",
+            label="Heads Option",
+            label_style=ft.TextStyle(color=AppColors.COLUMBIA_BLUE),
+            color=AppColors.TEXT_LIGHT,
+            bgcolor=AppColors.CARD_BG,
+            border=get_text_field_border(12),
+            prefix_icon=ft.Icons.RADIO_BUTTON_CHECKED,
+        )
+
+        self.tails_input = ft.TextField(
+            value="Tails",
+            label="Tails Option",
+            label_style=ft.TextStyle(color=AppColors.COLUMBIA_BLUE),
+            color=AppColors.TEXT_LIGHT,
+            bgcolor=AppColors.CARD_BG,
+            border=get_text_field_border(12),
+            prefix_icon=ft.Icons.CHANGE_CIRCLE,
+        )
+
+        self.flip_button = ft.FilledButton(
+            content=ft.Row(
+                alignment=ft.MainAxisAlignment.CENTER,
+                spacing=8,
+                controls=[
+                    ft.Icon(ft.Icons.TOLL_ROUNDED, color=AppColors.OXFORD_BLUE),
+                    ft.Text("Flip Coin", size=18, weight=ft.FontWeight.BOLD, color=AppColors.OXFORD_BLUE),
+                ],
+            ),
+            style=ft.ButtonStyle(
+                bgcolor=AppColors.SAFFRON,
+                padding=ft.Padding(left=24, right=24, top=16, bottom=16),
+                shape=ft.RoundedRectangleBorder(radius=12),
+            ),
+            width=280,
+            height=54,
+            on_click=self._flip_click,
+        )
+
+        presets = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            wrap=True,
+            spacing=8,
+            controls=[
+                self._create_preset_chip("Yes / No", "Yes", "No"),
+                self._create_preset_chip("Buy / Wait", "Buy", "Wait"),
+                self._create_preset_chip("Left / Right", "Left", "Right"),
+                self._create_preset_chip("Heads / Tails", "Heads", "Tails"),
+            ],
+        )
+
+        right_panel = ft.Container(
+            bgcolor=AppColors.SURFACE_VARIANT,
+            border_radius=16,
+            padding=ft.Padding(left=24, right=24, top=24, bottom=24),
+            border=ft.Border.all(1, AppColors.PRUSSIAN_BLUE),
+            content=ft.Column(
+                spacing=18,
+                controls=[
+                    ft.Text(
+                        "Coin Options",
+                        size=24,
+                        weight=ft.FontWeight.BOLD,
+                        color=AppColors.SAFFRON,
+                    ),
+                    ft.Text(
+                        "Customize the names for each side of the coin or pick a quick preset.",
+                        size=13,
+                        color=AppColors.TEXT_MUTED,
+                    ),
+                    self.heads_input,
+                    self.tails_input,
+                    ft.Text("Quick Presets:", size=13, weight=ft.FontWeight.BOLD, color=AppColors.COLUMBIA_BLUE),
+                    presets,
+                    ft.Container(height=10),
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.CENTER,
+                        controls=[self.flip_button],
+                    ),
+                ],
+            ),
+        )
+
+        return ft.ResponsiveRow(
+            alignment=ft.MainAxisAlignment.CENTER,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=32,
+            run_spacing=24,
+            controls=[
+                ft.Container(
+                    col={"xs": 12, "sm": 12, "md": 12, "lg": 6, "xl": 6},
+                    content=left_panel,
+                    alignment=ft.Alignment.CENTER,
+                ),
+                ft.Container(
+                    col={"xs": 12, "sm": 12, "md": 12, "lg": 6, "xl": 5},
+                    content=right_panel,
+                    alignment=ft.Alignment.CENTER,
+                ),
+            ],
+        )
+
+    def _create_stat_badge(self, label: str, value: str) -> ft.Control:
+        return ft.Container(
+            bgcolor=AppColors.CARD_BG,
+            border_radius=10,
+            padding=ft.Padding(left=16, right=16, top=10, bottom=10),
+            border=ft.Border.all(1, AppColors.PRUSSIAN_BLUE),
+            content=ft.Column(
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=2,
+                controls=[
+                    ft.Text(value, size=18, weight=ft.FontWeight.BOLD, color=AppColors.COLUMBIA_BLUE),
+                    ft.Text(label, size=12, color=AppColors.TEXT_MUTED),
+                ],
+            ),
+        )
+
+    def _create_preset_chip(self, label: str, heads_val: str, tails_val: str) -> ft.Control:
+        return ft.OutlinedButton(
+            content=ft.Text(label, size=12, color=AppColors.COLUMBIA_BLUE),
+            style=ft.ButtonStyle(
+                side=ft.BorderSide(1, AppColors.PRUSSIAN_BLUE),
+                shape=ft.RoundedRectangleBorder(radius=8),
+                padding=ft.Padding(left=10, right=10, top=6, bottom=6),
+            ),
+            on_click=lambda _: self._apply_preset(heads_val, tails_val),
+        )
+
+    def _apply_preset(self, heads: str, tails: str) -> None:
+        self.heads_input.value = heads
+        self.tails_input.value = tails
+        self.app_page.update()
+
+    def _update_stats_display(self) -> None:
+        self.stats_row.controls = [
+            self._create_stat_badge("Total", str(self.stats.total_flips)),
+            self._create_stat_badge("Heads", str(self.stats.heads_count)),
+            self._create_stat_badge("Tails", str(self.stats.tails_count)),
+        ]
+
+    async def _flip_click(self, _: ft.ControlEvent) -> None:
+        if self.is_flipping:
+            return
+
+        self.is_flipping = True
+        self.flip_button.disabled = True
+        self.flip_button.content = ft.ProgressRing(
+            width=22,
+            height=22,
+            stroke_width=2.5,
+            color=AppColors.OXFORD_BLUE,
+        )
+        self.result_badge.content = ft.Text(
+            "Coin in the air...",
+            size=18,
+            weight=ft.FontWeight.W_600,
             color=AppColors.COLUMBIA_BLUE,
-            width=275,
-            height=80,
-            on_click=self.flip_coin
+            text_align=ft.TextAlign.CENTER,
+        )
+        self.app_page.update()
+
+        # Decide final outcome upfront
+        heads_name = self.heads_input.value or "Heads"
+        tails_name = self.tails_input.value or "Tails"
+        result = flip_coin(heads_name, tails_name)
+
+        # Realistic 3D flip animation: squash and expand horizontally while flipping sides
+        num_spins = 6
+        current_side = CoinSide.HEADS
+
+        for i in range(num_spins):
+            # Collapse horizontally
+            self.coin_container.scale = ft.Scale(scale_x=0.08, scale_y=1.0)
+            self.app_page.update()
+            await asyncio.sleep(0.09)
+
+            # Alternate side visual at the apex of thinness
+            current_side = CoinSide.TAILS if current_side == CoinSide.HEADS else CoinSide.HEADS
+            self.coin_label.value = "HEADS" if current_side == CoinSide.HEADS else "TAILS"
+            self.coin_container.bgcolor = AppColors.SAFFRON if current_side == CoinSide.HEADS else AppColors.COLUMBIA_BLUE
+            self.coin_label.color = AppColors.OXFORD_BLUE
+
+            # Expand horizontally
+            self.coin_container.scale = ft.Scale(scale_x=1.0, scale_y=1.0)
+            self.app_page.update()
+            await asyncio.sleep(0.09)
+
+        # Final landing
+        self.coin_container.scale = ft.Scale(scale_x=0.08, scale_y=1.0)
+        self.app_page.update()
+        await asyncio.sleep(0.09)
+
+        # Set actual winner state
+        final_is_heads = result.side == CoinSide.HEADS
+        self.coin_label.value = "HEADS" if final_is_heads else "TAILS"
+        self.coin_container.bgcolor = AppColors.SAFFRON if final_is_heads else AppColors.COLUMBIA_BLUE
+        self.coin_container.scale = ft.Scale(scale_x=1.0, scale_y=1.0)
+        self.app_page.update()
+        await asyncio.sleep(0.12)
+
+        # Record statistics
+        self.stats.record(result)
+        self._update_stats_display()
+
+        # Update result display
+        self.result_badge.content = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=8,
+            controls=[
+                ft.Icon(ft.Icons.CHECK_CIRCLE_ROUNDED, color=AppColors.SUCCESS, size=24),
+                ft.Text(
+                    f"Result: {result.label} ({result.side.value})",
+                    size=22,
+                    weight=ft.FontWeight.BOLD,
+                    color=AppColors.SAFFRON,
+                ),
+            ],
         )
 
-        coin_section = ft.Column([
-            ft.Container(
-                content=self.coin_container,
-                alignment=ft.alignment.center,
-                width=700,
-                height=350,
-            ),
-            ft.Container(
-                content=self.result_text,
-                alignment=ft.alignment.center,
-                width=700,
-                height=100,
-            )
-        ])
-
-        input_section = ft.Column([
-            ft.Container(
-                content=game_title,
-                width=500,
-                height=100,
-                alignment=ft.alignment.center
-            ),
-            ft.Container(
-                content=ft.Column(
-                    [self.head_input, self.tail_input], spacing=20),
-                width=500,
-                height=300,
-                alignment=ft.alignment.center
-            ),
-            ft.Container(
-                content=flip_button,
-                width=500,
-                height=150,
-                alignment=ft.alignment.center,
-                # Add some top margin for better spacing
-                margin=ft.margin.only(top=10),
-            )
-        ], alignment=ft.MainAxisAlignment.CENTER)  # Center align the column contents
-
-        # Game container
-        game = ft.Container(
-            content=coin_section,
-            width=700,
-            height=758,
-            alignment=ft.alignment.center,
+        # Re-enable button
+        self.flip_button.disabled = False
+        self.flip_button.content = ft.Row(
+            alignment=ft.MainAxisAlignment.CENTER,
+            spacing=8,
+            controls=[
+                ft.Icon(ft.Icons.TOLL_ROUNDED, color=AppColors.OXFORD_BLUE),
+                ft.Text("Flip Coin", size=18, weight=ft.FontWeight.BOLD, color=AppColors.OXFORD_BLUE),
+            ],
         )
-
-        user_input = ft.Container(
-            content=input_section,
-            width=500,
-            height=758,
-        )
-
-        row = ft.Row(spacing=0, controls=[game, user_input])
-
-        container = ft.Container(
-            content=row,
-            width=1200,
-            height=758,
-            bgcolor=AppColors.OXFORD_BLUE,
-            visible=self.visible
-        )
-
-        return container
-
-    def flip_coin(self, _):  # Using underscore to indicate unused parameter
-        head = self.head_input.value or "Heads"
-        tail = self.tail_input.value or "Tails"
-
-        # Animate the coin flip
-        self.coin_container.rotate = ft.transform.Rotate(
-            0, alignment=ft.alignment.center)
-        self.page.update()
-
-        # First flip animation
-        self.coin_container.rotate = ft.transform.Rotate(
-            angle=2 * math.pi,
-            alignment=ft.alignment.center,
-        )
-        self.page.update()
-
-        # Use a progress bar to indicate that something is happening
-        self.page.splash = ft.ProgressBar()
-        self.page.update()
-
-        # Schedule the delayed action using threading
-        def delayed_action():
-            # Simulate the waiting time for the animation
-            time.sleep(0.8)
-
-            # Determine the result
-            result = random.choice([head, tail])
-            side = "HEADS" if result == head else "TAILS"
-
-            # Schedule the UI update in the main thread
-            def update_ui():
-                self.coin_container.content = ft.Text(
-                    side, size=30, color=AppColors.OXFORD_BLUE)
-                self.result_text.value = f"Result: {result}"
-                self.page.splash = None
-
-                # Create a more visible dialog to show the result
-                dlg = ft.AlertDialog(
-                    title=ft.Text("Coin Result!"),
-                    content=ft.Text(
-                        f"The result is: {result}", size=24, color=ft.Colors.GREEN),
-                    actions=[
-                        ft.TextButton(
-                            "Accept", on_click=lambda _: close_dlg(dlg))
-                    ],
-                )
-
-                def close_dlg(dialog):
-                    dialog.open = False
-                    self.page.update()
-
-                self.page.dialog = dlg
-                dlg.open = True
-                self.page.update()
-
-            # Execute UI update
-            if hasattr(self.page, 'add_future'):  # Check if the method exists
-                self.page.add_future(update_ui)
-            else:
-                # Alternative: execute directly (less ideal)
-                update_ui()
-
-        # Execute the delayed action in a separate thread
-        threading.Thread(target=delayed_action).start()
+        self.is_flipping = False
+        self.app_page.update()

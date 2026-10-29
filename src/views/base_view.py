@@ -1,27 +1,39 @@
+"""Base view component for Choislet screens."""
+
+from __future__ import annotations
 import flet as ft
+from src.utils.constants import AppColors
 
 
-class BaseView:
-    def __init__(self, page: ft.Page):
-        self.page = page
-        self.visible = False
-        self.view = self.build()
+class BaseView(ft.Container):
+    """Abstract base view providing responsive container layout and page reference."""
 
-    def build(self):
-        """
-        Builds the view interface. This method should be overridden
-        by child classes.
-        """
-        return ft.Container()
+    def __init__(self, page: ft.Page, **kwargs):
+        super().__init__(
+            expand=True,
+            bgcolor=AppColors.OXFORD_BLUE,
+            padding=ft.Padding(left=20, right=20, top=20, bottom=20),
+            **kwargs,
+        )
+        self._app_page = page
+        self.content = self.init_view()
 
-    def show(self):
-        """Shows the view"""
-        self.visible = True
-        self.view.visible = True
-        self.page.update()
+    @property
+    def app_page(self) -> ft.Page:
+        """Return attached page or fallback stored reference."""
+        try:
+            return self.page or self._app_page
+        except Exception:
+            return self._app_page
 
-    def hide(self):
-        """Hides the view"""
-        self.visible = False
-        self.view.visible = False
-        self.page.update()
+    def init_view(self) -> ft.Control:
+        """Construct and return the view's root control."""
+        raise NotImplementedError("Subclasses of BaseView must implement init_view().")
+
+    def on_activate(self) -> None:
+        """Hook called when view becomes active."""
+        pass
+
+    def on_deactivate(self) -> None:
+        """Hook called when view is navigated away from."""
+        pass
