@@ -23,12 +23,87 @@ class RouletteView(BaseView):
         self.sectors: list[RouletteSector] = calculate_sectors(self.candidates)
         self.current_rotation: float = 0.0
         self.is_spinning: bool = False
+        self._spin_event: asyncio.Event | None = None
 
-        self.canvas_size = 500
+        self._app_page_ref = page
+        self.canvas_size = self._get_responsive_size()
         self.center = self.canvas_size / 2.0
-        self.wheel_radius = 230.0
+        self.wheel_radius = self.canvas_size * 0.46
+
+        self.is_web = getattr(page, "web", False)
+        self.spin_duration_ms = 5200 if self.is_web else 4000
+        self.spin_curve = ft.AnimationCurve.EASE_OUT_CUBIC
 
         super().__init__(page)
+
+    def _get_responsive_size(self) -> float:
+        try:
+            page = getattr(self, "app_page", None) or getattr(self, "_app_page_ref", None)
+            pw = getattr(page, "width", None)
+            if pw is not None and isinstance(pw, (int, float)) and pw > 0:
+                if pw >= 992:
+                    return 500.0
+                available = float(pw) - 112.0
+                return max(280.0, min(500.0, available))
+        except Exception:
+            pass
+        return 500.0
+
+    def _create_pointer_shapes(self) -> list[cv.Shape]:
+        arrow_w = max(20.0, self.canvas_size * 0.064)
+        arrow_h = max(24.0, self.canvas_size * 0.064)
+        return [
+            cv.Path(
+                [
+                    cv.Path.MoveTo(self.canvas_size, self.center - (arrow_h / 2.0)),
+                    cv.Path.LineTo(self.canvas_size, self.center + (arrow_h / 2.0)),
+                    cv.Path.LineTo(self.canvas_size - arrow_w, self.center),
+                    cv.Path.Close(),
+                ],
+                paint=ft.Paint(color=AppColors.SAFFRON, style=ft.PaintingStyle.FILL),
+            ),
+            cv.Path(
+                [
+                    cv.Path.MoveTo(self.canvas_size, self.center - (arrow_h / 2.0)),
+                    cv.Path.LineTo(self.canvas_size, self.center + (arrow_h / 2.0)),
+                    cv.Path.LineTo(self.canvas_size - arrow_w, self.center),
+                    cv.Path.Close(),
+                ],
+                paint=ft.Paint(color=AppColors.OXFORD_BLUE, stroke_width=2, style=ft.PaintingStyle.STROKE),
+            ),
+        ]
+
+    def _apply_size(self, size: float) -> None:
+        self.canvas_size = size
+        self.center = self.canvas_size / 2.0
+        self.wheel_radius = self.canvas_size * 0.46
+
+        self.wheel_container.width = self.canvas_size
+        self.wheel_container.height = self.canvas_size
+
+        self.pointer_canvas.shapes = self._create_pointer_shapes()
+        self.pointer_canvas.width = self.canvas_size
+        self.pointer_canvas.height = self.canvas_size
+
+        self.wheel_stack.width = self.canvas_size
+        self.wheel_stack.height = self.canvas_size
+
+        self._render_wheel()
+
+    def on_resize(self) -> None:
+        if self.is_spinning:
+            return
+        new_size = self._get_responsive_size()
+        if abs(new_size - self.canvas_size) > 10:
+            self._apply_size(new_size)
+            try:
+                self.app_page.update()
+            except Exception:
+                pass
+
+    def _on_animation_end(self, _: ft.ControlEvent) -> None:
+        if self._spin_event and not self._spin_event.is_set():
+            self._spin_event.set()
 
     def init_view(self) -> ft.Control:
         # Canvas control holding wheel shapes
@@ -45,37 +120,18 @@ class RouletteView(BaseView):
             height=self.canvas_size,
             alignment=ft.Alignment.CENTER,
             rotate=0.0,
-            animate_rotation=ft.Animation(4500, ft.AnimationCurve.DECELERATE),
+            animate_rotation=ft.Animation(self.spin_duration_ms, self.spin_curve),
+            on_animation_end=self._on_animation_end,
         )
 
         # Fixed pointer arrow canvas on top
-        pointer_shapes = [
-            cv.Path(
-                [
-                    cv.Path.MoveTo(self.canvas_size, self.center - 16),
-                    cv.Path.LineTo(self.canvas_size, self.center + 16),
-                    cv.Path.LineTo(self.canvas_size - 32, self.center),
-                    cv.Path.Close(),
-                ],
-                paint=ft.Paint(color=AppColors.SAFFRON, style=ft.PaintingStyle.FILL),
-            ),
-            cv.Path(
-                [
-                    cv.Path.MoveTo(self.canvas_size, self.center - 16),
-                    cv.Path.LineTo(self.canvas_size, self.center + 16),
-                    cv.Path.LineTo(self.canvas_size - 32, self.center),
-                    cv.Path.Close(),
-                ],
-                paint=ft.Paint(color=AppColors.OXFORD_BLUE, stroke_width=2, style=ft.PaintingStyle.STROKE),
-            ),
-        ]
         self.pointer_canvas = cv.Canvas(
-            shapes=pointer_shapes,
+            shapes=self._create_pointer_shapes(),
             width=self.canvas_size,
             height=self.canvas_size,
         )
 
-        wheel_stack = ft.Stack(
+        self.wheel_stack = ft.Stack(
             controls=[
                 self.wheel_container,
                 self.pointer_canvas,
@@ -106,7 +162,7 @@ class RouletteView(BaseView):
             alignment=ft.MainAxisAlignment.CENTER,
             spacing=20,
             controls=[
-                wheel_stack,
+                self.wheel_stack,
                 self.result_badge,
             ],
         )
@@ -258,7 +314,9 @@ class RouletteView(BaseView):
         num_colors = len(AppColors.ROULETTE_COLORS)
         num_candidates = len(self.candidates)
 
-        font_size = 13 if num_candidates <= 8 else (11 if num_candidates <= 14 else 9)
+        font_scale = self.canvas_size / 500.0
+        base_font = 13 if num_candidates <= 8 else (11 if num_candidates <= 14 else 9)
+        font_size = max(8, int(base_font * font_scale))
 
         for s in self.sectors:
             color = AppColors.ROULETTE_COLORS[s.index % num_colors]
@@ -323,19 +381,21 @@ class RouletteView(BaseView):
         )
 
         # Center hub
+        hub_outer = max(16.0, self.canvas_size * 0.052)
+        hub_inner = max(5.0, self.canvas_size * 0.016)
         shapes.append(
-            cv.Circle(center, center, 26, paint=ft.Paint(color=AppColors.OXFORD_BLUE, style=ft.PaintingStyle.FILL))
+            cv.Circle(center, center, hub_outer, paint=ft.Paint(color=AppColors.OXFORD_BLUE, style=ft.PaintingStyle.FILL))
         )
         shapes.append(
             cv.Circle(
                 center,
                 center,
-                26,
+                hub_outer,
                 paint=ft.Paint(color=AppColors.SAFFRON, stroke_width=2.5, style=ft.PaintingStyle.STROKE),
             )
         )
         shapes.append(
-            cv.Circle(center, center, 8, paint=ft.Paint(color=AppColors.SAFFRON, style=ft.PaintingStyle.FILL))
+            cv.Circle(center, center, hub_inner, paint=ft.Paint(color=AppColors.SAFFRON, style=ft.PaintingStyle.FILL))
         )
 
         self.wheel_canvas = cv.Canvas(
@@ -401,19 +461,32 @@ class RouletteView(BaseView):
         )
         self.app_page.update()
 
+        # Calibrate rotation count according to platform
+        is_web = getattr(self.app_page, "web", False)
+        min_rot = 3 if is_web else 4
+        max_rot = 5 if is_web else 6
+
         # Calculate spin destination
-        spin_radians = generate_spin_target(min_rotations=5, max_rotations=8)
+        spin_radians = generate_spin_target(min_rotations=min_rot, max_rotations=max_rot)
         new_rotation = self.current_rotation + spin_radians
+
+        self._spin_event = asyncio.Event()
 
         # Trigger smooth rotation
         self.wheel_container.rotate = new_rotation
         self.app_page.update()
 
-        # Wait for deceleration animation to finish (4.5s duration)
-        await asyncio.sleep(4.7)
+        # Wait for client animation to finish (with fallback timeout)
+        try:
+            await asyncio.wait_for(
+                self._spin_event.wait(),
+                timeout=(self.spin_duration_ms / 1000.0) + 0.3,
+            )
+        except asyncio.TimeoutError:
+            pass
 
         winner = determine_winner(self.sectors, new_rotation)
-        self.current_rotation = new_rotation % (2.0 * math.pi)
+        self.current_rotation = new_rotation
 
         # Present winner
         self.result_badge.content = ft.Row(

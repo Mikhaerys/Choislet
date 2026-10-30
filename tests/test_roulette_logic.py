@@ -60,3 +60,23 @@ def test_generate_spin_target():
     # Winner should be Option 1
     winner = determine_winner(sectors, target_rotation)
     assert winner == "Option 1"
+
+
+def test_generate_spin_target_default():
+    target_rotation = generate_spin_target()
+    assert target_rotation >= 4 * 2 * math.pi
+
+
+def test_generate_spin_target_with_accumulated_rotation():
+    sectors = calculate_sectors(["Option 1", "Option 2", "Option 3"])
+    current_rot = 34.56
+    target_rotation = generate_spin_target(
+        min_rotations=4,
+        max_rotations=4,
+        target_sector_index=1,
+        sectors=sectors,
+        current_rotation=current_rot,
+    )
+    total_rot = current_rot + target_rotation
+    winner = determine_winner(sectors, total_rot)
+    assert winner == "Option 2"

@@ -16,7 +16,17 @@ class BaseView(ft.Container):
             **kwargs,
         )
         self._app_page = page
-        self.content = self.init_view()
+        view_content = self.init_view()
+        if isinstance(view_content, ft.Column) and view_content.scroll:
+            self.content = view_content
+        else:
+            self.content = ft.Column(
+                controls=[view_content],
+                scroll=ft.ScrollMode.ADAPTIVE,
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                alignment=ft.MainAxisAlignment.START,
+                expand=True,
+            )
 
     @property
     def app_page(self) -> ft.Page:
@@ -36,4 +46,8 @@ class BaseView(ft.Container):
 
     def on_deactivate(self) -> None:
         """Hook called when view is navigated away from."""
+        pass
+
+    def on_resize(self) -> None:
+        """Hook called when page window size changes."""
         pass

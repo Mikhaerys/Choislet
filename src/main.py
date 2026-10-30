@@ -33,6 +33,7 @@ class ChoisletApp:
         self.page.theme_mode = ft.ThemeMode.DARK
         self.page.padding = 0
         self.page.bgcolor = AppColors.OXFORD_BLUE
+        self.page.on_resize = self._on_page_resize
 
         # Configure responsive desktop window boundaries if running in desktop mode
         try:
@@ -135,6 +136,10 @@ class ChoisletApp:
     def current_view(self):
         return self.views[self.rail.selected_index]
 
+    def _on_page_resize(self, _: ft.ControlEvent) -> None:
+        if hasattr(self.current_view, "on_resize"):
+            self.current_view.on_resize()
+
     def _on_rail_change(self, e: ft.ControlEvent) -> None:
         idx = int(e.control.selected_index)
         self.switch_to_tab(idx)
@@ -147,6 +152,7 @@ class ChoisletApp:
                 view.visible = is_active
                 if is_active:
                     view.on_activate()
+                    view.on_resize()
                 else:
                     view.on_deactivate()
             self.page.update()

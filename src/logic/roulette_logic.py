@@ -70,10 +70,11 @@ def determine_winner(sectors: list[RouletteSector], total_rotation_radians: floa
 
 
 def generate_spin_target(
-    min_rotations: int = 5,
-    max_rotations: int = 8,
+    min_rotations: int = 4,
+    max_rotations: int = 6,
     target_sector_index: int | None = None,
     sectors: list[RouletteSector] | None = None,
+    current_rotation: float = 0.0,
 ) -> float:
     """Generate total rotation in radians with full spins plus random final offset."""
     full_rotations = random.randint(min_rotations, max_rotations)
@@ -83,7 +84,8 @@ def generate_spin_target(
         sector = sectors[target_sector_index]
         # Land somewhere in the middle 80% of the target sector
         target_effective = sector.start_angle + (sector.sweep_angle * random.uniform(0.1, 0.9))
-        needed_offset = (two_pi - target_effective) % two_pi
+        current_offset = current_rotation % two_pi
+        needed_offset = (two_pi - target_effective - current_offset) % two_pi
         return (full_rotations * two_pi) + needed_offset
 
     # Completely random angle
